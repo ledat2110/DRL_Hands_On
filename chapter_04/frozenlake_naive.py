@@ -11,6 +11,18 @@ HIDDEN_SIZE = 128
 BATCH_SIZE = 16
 PERCENTILE = 70
 
+class DiscreteOneHotWrapper (gym.ObservationWrapper):
+    def __init__ (self, env: gym.Env):
+        super (DiscreteOneHotWrapper, self).__init__(env)
+        assert isinstance(env.observation_space, gym.spaces.Discrete)
+        shape = (env.observation_space.n, )
+        self.observation_space = gym.spaces.Box(0.0, 1.0, shape, dtype=np.float32)
+
+    def observation (self, observation):
+        res = np.copy(self.observation_space.low)
+        res[observation] = 1.0
+        return res
+
 class Net (nn.Module):
     def __init__ (self, obs_size: int, hidden_size: int, n_actions: int):
         super (Net, self).__init__()
@@ -78,7 +90,7 @@ def filter_batch (batch: Episode, percentile: float):
     return train_obs_v, train_act_v, reward_bound, reward_mean
 
 if __name__ == "__main__":
-    env = gym.make("CartPole-v0")
+    env = DiscreteOneHotWrapper(gym.make("FrozenLake-v0"))
     env = gym.wrappers.Monitor(env, directory="mon", force=True)
     obs_size = env.observation_space.shape[0]
     n_actions = env.action_space.n
@@ -103,7 +115,7 @@ if __name__ == "__main__":
         writer.add_scalar("reward_bound", reward_b, iter_no)
         writer.add_scalar("reward_mean", reward_m, iter_no)
 
-        if reward_m >= 199:
+        if reward_m >= 0.8:
             solved_episode += 1
         if solved_episode >= 10:
             print("solved")
