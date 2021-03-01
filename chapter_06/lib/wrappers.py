@@ -11,7 +11,7 @@ class FireResetEnv (gym.Wrapper):
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def step (self, action):
-        return self.evn.step(action)
+        return self.env.step(action)
 
     def reset (self):
         self.env.reset()
@@ -50,7 +50,7 @@ class MaxAndSkipEnv (gym.Wrapper):
 
 class ProcessFrame84 (gym.ObservationWrapper):
     def __init__ (self, env: gym.Env=None):
-        super(ProcessFrame84, self).__init__(env):
+        super(ProcessFrame84, self).__init__(env)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
     def observation (self, obs):
@@ -84,6 +84,8 @@ class BufferWrapper (gym.ObservationWrapper):
 
     def reset (self):
         self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
+        obs = self.observation(self.env.reset())
+        return obs
     
     def observation (self, obs):
         self.buffer[:-1] = self.buffer[1:]
