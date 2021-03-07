@@ -1,6 +1,7 @@
 import numpy as np
 import gym
 import ptan
+import rl_lib
 
 from typing import List, Optional, Any, Tuple
 
@@ -29,28 +30,41 @@ class DullAgent (ptan.agent.BaseAgent):
     def __call__ (self, observations: List[Any], state: Optional[List]=None) -> Tuple[List[int], Optional[List]]:
         return [self.action for _ in observations], state
 
+class DullAgent1 (rl_lib.agent.BaseAgent):
+    def __init__ (self, action: int):
+        self.action = action
+
+    def __call__ (self, observations: List[Any], state: Optional[List]=None) -> Tuple[List[int], Optional[List]]:
+        return [self.action for _ in observations]
+
 if __name__ == "__main__":
     env = ToyEnv()
     agent = DullAgent(action=1)
-    exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=2)
-    for idx, exp in enumerate(exp_source):
-        if idx > 15:
-            break
-        print(idx, exp)
+    # exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=2)
+    # for idx, exp in enumerate(exp_source):
+    #     if idx > 15:
+    #         break
+    #     print(idx, exp)
 
-    exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=4)
-    print(next(iter(exp_source)))
+    # exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=4)
+    # print(next(iter(exp_source)))
 
-    print("multi env")
-    exp_source = ptan.experience.ExperienceSource(env=[ToyEnv(), ToyEnv()], agent=agent, steps_count=2)
-    for idx, exp in enumerate(exp_source):
-        if idx > 4:
-            break
-        print(exp)
+    # print("multi env")
+    # exp_source = ptan.experience.ExperienceSource(env=[ToyEnv(), ToyEnv()], agent=agent, steps_count=2)
+    # for idx, exp in enumerate(exp_source):
+    #     if idx > 4:
+    #         break
+    #     print(exp)
 
     print("exp source first last")
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=1.0, steps_count=1)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=1.0, steps_count=2)
     for idx, exp in enumerate(exp_source):
         print(idx, exp)
-        if idx > 10:
+        if idx > 3:
             break 
+
+    # exp_source = rl_lib.experience.ExperienceSourceFirstLast(env, agent, 0.9, 2)
+    # for idx, exp in enumerate(exp_source):
+    #     print(idx, exp)
+    #     if idx > 3:
+    #         break

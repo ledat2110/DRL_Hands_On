@@ -1,6 +1,6 @@
 import numpy as np
 import gym
-import ptan
+import rl_lib
 
 from typing import List, Optional, Any, Tuple
 
@@ -22,14 +22,14 @@ class ToyEnv (gym.Env):
         self.step_index += 1
         return self.step_index % self.observation_space.n, float(action), self.step_index == 10, {}
 
-class DullAgent (ptan.agent.BaseAgent):
+class DullAgent (rl_lib.agent.BaseAgent):
     def __init__ (self, action: int):
         self.action = action
 
-    def __call__ (self, observations: List[Any], state: Optional[List]=None) -> Tuple[List[int], Optional[List]]:
-        return [self.action for _ in observations], state
+    def __call__ (self, observations: List[Any]) -> Tuple[List[int], Optional[List]]:
+        return [self.action for _ in observations]
 
-def batch_genartate (buffer: ptan.experience.ExperienceReplayBuffer, size):
+def batch_genartate (buffer: rl_lib.experience.ExperienceReplayBuffer, size):
     while True:
         buffer.populate(1)
         yield buffer.sample(size)
@@ -37,8 +37,8 @@ def batch_genartate (buffer: ptan.experience.ExperienceReplayBuffer, size):
 if __name__ == "__main__":
     env = ToyEnv()
     agent = DullAgent(action=1)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=1.0, steps_count=1)
-    buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=100)
+    exp_source = rl_lib.experience.ExperienceSourceFirstLast(env, agent, gamma=1.0, steps_count=1)
+    buffer = rl_lib.experience.ExperienceReplayBuffer(exp_source, buffer_size=100)
     print("len buffer", len(buffer))
     
     for step in range(6):
