@@ -1,7 +1,6 @@
 import numpy as np
 import gym
 import ptan
-import rl_lib
 
 from typing import List, Optional, Any, Tuple
 
@@ -62,9 +61,3 @@ if __name__ == "__main__":
         print(idx, exp)
         if idx > 3:
             break 
-
-    # exp_source = rl_lib.experience.ExperienceSourceFirstLast(env, agent, 0.9, 2)
-    # for idx, exp in enumerate(exp_source):
-    #     print(idx, exp)
-    #     if idx > 3:
-    #         break

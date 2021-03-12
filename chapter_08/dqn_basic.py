@@ -1,60 +1,135 @@
-import gym
-import ptan
-import random
+from lib import common
+from lib import dqn_model
+
 import argparse
+import time
+import numpy as np
+import collections
+import random
 
 import torch
+import torch.nn as nn
 import torch.optim as optim
 
-from ignite.engine import Engine
+from tensorboardX import SummaryWriter
+import drl.agent as dag
+import drl.actions as dac
+import drl.experience as dexp
+import drl
 
-from lib import dqn_model, common
-from types import SimpleNamespace
+import gym
 
-import rl_lib
+# DEFAULT_ENV_NAME = "CartPole-v0"
+# MEAN_REWARD_BOUND = 180.
 
-NAME = "01_baseline"
+# GAMMA = 0.99
+# BATCH_SIZE = 16
+# REPLAY_SIZE = 1000
+# REPLAY_START_SIZE = 1000
+# LEARNING_RATE = 1e-2
+# SYNC_TARGET_FRAMES = 10
+
+# EPSILON_DECAY_LAST_FRAME = 10**5
+# EPSILON_START = 1.0
+# EPSILON_FINAL = 0.01
+
+Experience = collections.namedtuple(
+    'Experience', field_names=['state', 'action', 'reward', 'done', 'new_state']
+)
+
+def calc_loss (batch, net, tgt_net, gamma, device="cpu"):
+    states, actions, rewards, dones, next_states = batch
+
+    states_v = torch.tensor(np.array(states, copy=False), dtype=torch.float32).to(device)
+    next_states_v = torch.tensor(np.array(next_states, copy=False), dtype=torch.float32).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    rewards_v = torch.tensor(rewards).to(device)
+    done_mask = torch.BoolTensor(dones).to(device)
+
+    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1).type(torch.int64)).squeeze(-1)
+    with torch.no_grad():
+        next_state_values = tgt_net(next_states_v).max(1)[0]
+        next_states_v[done_mask] = 0.0
+        next_state_values = next_state_values.detach()
+
+    expected_state_action_values = next_state_values * gamma + rewards_v
+    loss = nn.MSELoss()(state_action_values, expected_state_action_values)
+
+    return loss
 
 if __name__ == "__main__":
     random.seed(common.SEED)
     torch.manual_seed(common.SEED)
     params = common.HYPERPARAMS['pong']
-    
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
+    parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
-
     device = torch.device("cuda" if args.cuda else "cpu")
 
     env = gym.make(params.env_name)
-    env = ptan.common.wrappers.wrap_dqn(env)
+    env = drl.common.wrappers.wrap_dqn(env)
     env.seed(common.SEED)
+    input_shape = env.observation_space.shape
+    n_actions = env.action_space.n
 
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
-    tgt_net = ptan.agent.TargetNet(net)
+    selector = dac.EpsilonGreedySelector()
+    eps_tracker = dac.EpsilonTracker(selector, params.epsilon_start, params.epsilon_final, params.epsilon_frames)
 
-    selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=params.epsilon_start)
-    epsilon_tracker = common.EpsilonTracker(selector, params)
-    agent = ptan.agent.DQNAgent(net, selector, device=device)
+    net = dqn_model.DQN(input_shape, n_actions).to(device)
+    agent = dag.DQNAgent(net, selector, device)
+    tgt_net = dag.TargetNet(net)
 
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params.gamma)
-    buffer = ptan.experience.ExperienceReplayBuffer(exp_source, params.replay_size)
+    buffer = dexp.ReplayBuffer(params.replay_size)
+    exp_source = dexp.ExperienceSource(env, agent, buffer, 1, params.gamma)
+
+    writer = SummaryWriter(comment="-" + params.env_name)
+    print(net)
 
     optimizer = optim.Adam(net.parameters(), lr=params.learning_rate)
+    total_reward = []
+    frame_idx = 0
+    ts_frame = 0
+    ts = time.time()
+    best_m_reward = None
 
-    def process_batch (engine, batch):
-        optimizer.zero_grad()
-        loss_v = common.calc_loss(batch, net, tgt_net.target_model, gamma=params.gamma, device=device)
-        loss_v.backward()
-        optimizer.step()
-        epsilon_tracker.frame(engine.state.iteration)
-        if engine.state.iteration % params.target_net_sync == 0:
+    while True:
+        frame_idx += 1
+        eps_tracker.decay_eps(frame_idx)
+        exp_source.play_steps()
+        
+        reward, step = exp_source.reward_step()
+        
+        if reward is not None:
+            total_reward.append(reward)
+            speed = step / (time.time() - ts)
+            ts = time.time()
+            m_reward = np.mean(total_reward[-100:])
+            print("%d: done %d games, reward %.3f, eps %.2f, speed %.2f f/s"%(frame_idx, len(total_reward), m_reward, selector.epsilon, speed))
+            writer.add_scalar("epsilon", selector.epsilon, frame_idx)
+            writer.add_scalar("speed", speed, frame_idx)
+            writer.add_scalar("reward_100", m_reward, frame_idx)
+            writer.add_scalar("reward", reward, frame_idx)
+
+            if best_m_reward is None or best_m_reward < m_reward:
+                torch.save(net.state_dict(), params.env_name + "-best_%.0f.dat"%m_reward)
+                if best_m_reward is not None:
+                    print("Best reward update %.3f -> %.3f"%(best_m_reward, m_reward))
+                best_m_reward = m_reward
+
+            if m_reward > params.stop_reward:
+                print("Solved in %d frames!" % frame_idx)
+                break
+
+        if len(buffer) < params.replay_initial:
+            continue
+
+        if frame_idx % params.target_net_sync == 0:
             tgt_net.sync()
-        return {
-            "loss": loss_v.item(),
-            "epsilon": selector.epsilon,
-        }
-    
-    engine = Engine(process_batch)
-    common.setup_ignite(engine, params, exp_source, NAME)
-    engine.run(common.batch_generator(buffer, params.replay_initial, params.batch_size))
+
+        optimizer.zero_grad()
+        batch = buffer.sample(params.batch_size)
+        loss_t = calc_loss(batch, agent.dqn_model, tgt_net.target_model, params.gamma, device)
+        loss_t.backward()
+        optimizer.step()
+
+    writer.close()
