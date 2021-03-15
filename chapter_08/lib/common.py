@@ -5,10 +5,6 @@ import torch
 import torch.nn as nn
 
 
-from ignite.engine import Engine
-from ignite.metrics import RunningAverage
-from ignite.contrib.handlers import tensorboard_logger as tb_logger
-
 from datetime import timedelta, datetime
 from typing import Iterable, List, Tuple
 from types import SimpleNamespace

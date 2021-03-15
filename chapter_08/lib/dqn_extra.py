@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+import drl.model as model
+
 class NoisyLinear (nn.Linear):
     def __init__ (self, in_features: int, out_features: int, sigma_init: float=0.017, bias: bool=True):
         super(NoisyLinear, self).__init__(in_features, out_features, bias)
@@ -80,8 +82,8 @@ class NoisyDQN (nn.Module):
 
         conv_out_size = self._get_conv_out(input_shape)
         self.noisy_layers = [
-            NoisyLinear(conv_out_size, 512),
-            NoisyLinear(512, n_actions)
+            model.NoisyLinear(conv_out_size, 512),
+            model.NoisyLinear(512, n_actions)
         ]
         self.fc = nn.Sequential(
             self.noisy_layers[0],
@@ -285,3 +287,40 @@ class DistributionDQN (nn.Module):
 
     def apply_softmax (self, t):
         return self.softmax(t.view(-1, N_ATOMS)).view(t.size())
+
+class RainbowDQN (nn.Module):
+    def __init__ (self, input_shape, n_actions):
+        super(RainbowDQN, self).__init__()
+
+        self.conv = nn.Sequential(
+                nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
+                nn.ReLU(),
+                nn.Conv2d(32, 64, kernel_size=4, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1),
+                nn.ReLU()
+                )
+        conv_out_size = self._get_conv_out(input_shape)
+        self.fc_adv = nn.Sequential(
+                NoisyLinear(conv_out_size, 256),
+                nn.ReLU(),
+                NoisyLinear(256, n_actions)
+                )
+        self.fc_val = nn.Sequential(
+                nn.Linear(conv_out_size, 256),
+                nn.ReLU(),
+                nn.Linear(256, 1)
+                )
+
+    def _get_conv_out (self, input_shape):
+        o = self.conv(torch.zeros(1, *input_shape))
+        return int(np.prod(o.size()))
+
+    def forward (self, x):
+        adv, val = self.adv_val(x)
+        return val + (adv - adv.mean(dim=1, keepdim=True))
+
+    def adv_val (self, x):
+        fx = x.float() / 256
+        conv_out = self.conv(fx).view(fx.size()[0], -1)
+        return self.fc_adv(conv_out), self.fc_val(conv_out)
