@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         batch = buffer.sample(params.batch_size)
-        loss_t = calc_loss(batch, agent.dqn_model, tgt_net.target_model, params.gamma, device)
+        loss_t = calc_loss(batch, agent.model, tgt_net.target_model, params.gamma, device)
         loss_t.backward()
         optimizer.step()
 
