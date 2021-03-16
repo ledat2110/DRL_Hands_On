@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(net)
 
     optimizer = optim.Adam(net.parameters(), lr=params.learning_rate)
-    loss = drl.loss.DQNLoss(agent.model, tgt_net.target_model, params.gamma, device)
+    loss = drl.net.loss.DQNLoss(agent.model, tgt_net.target_model, params.gamma, device)
     total_reward = []
     frame_idx = 0
     ts_frame = 0

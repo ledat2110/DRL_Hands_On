@@ -149,24 +149,22 @@ class Trainer:
             self._update_tracker()
             self.exp_source.play_steps()
 
-            reward, step = self.exp_source.reward_step()
+            #reward, step = self.exp_source.reward_step()
 
-            if reward is not None:
-                self.rewards.append(reward)
-                self.steps.append(step)
-                self._fps(step)
-                self._cal_metric()
-                self._print_out()
+            #if reward is not None:
+            #    self.rewards.append(reward)
+            #    self.steps.append(step)
+            #    self._fps(step)
+            #    self._cal_metric()
+            #    self._print_out()
 
-                self._update_best_m_reward()
+            #    self._update_best_m_reward()
 
-                if self.m_reward > stop_reward:
-                    print("solved in %d iter"%self.iteration)
-                    break
+            #    self._check_stop_reward()
 
-            #self._end_of_iteration()
-            #if self.stop:
-            #    break
+            self._end_of_iteration()
+            if self.stop:
+                break
 
             if len(self.exp_source.buffer) < self.initial_size:
                 continue
@@ -216,7 +214,7 @@ if __name__ == "__main__":
     print(net)
 
     optimizer = optim.Adam(net.parameters(), lr=params.learning_rate)
-    loss = drl.loss.DQNLoss(net, tgt_net.target_model, params.gamma, device)
+    loss = drl.net.loss.DQNLoss(net, tgt_net.target_model, params.gamma, device)
 
     trainer = Trainer()
     trainer.add_agent(agent)
