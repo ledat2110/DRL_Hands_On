@@ -51,7 +51,7 @@ def play_func (params, net, cuda, exp_queue):
 
         reward, step = exp_source.reward_step()
         if reward is not None:
-            exp_queue.put(EpisodeEnded(reward, step, selector.epsilon))
+            exp_queue.put(drl.experience.EpisodeEnded(reward, step))
 
 if __name__ == "__main__":
 
@@ -91,48 +91,56 @@ if __name__ == "__main__":
     best_m_reward = None
 
     play_proc.start()
-    while True:
-        reward, step, epsilon = None, None, None
-        while exp_queue.qsize() > 0:
-            exp = exp_queue.get()
-            if isinstance(exp, EpisodeEnded):
-                reward, step, epsilon = exp.reward, exp.step, exp.epsilon
-            else:
-                rp_buffer.append(exp)
 
-        if reward is not None:
-            total_reward.append(reward)
-            speed = step / (time.time() - ts)
-            ts = time.time()
-            m_reward = np.mean(total_reward[-100:])
-            print("%d: done %d games, reward %.3f, eps %.2f, speed %.2f f/s"%(frame_idx, len(total_reward), m_reward, epsilon, speed))
-            writer.add_scalar("epsilon", epsilon, frame_idx)
-            writer.add_scalar("speed", speed, frame_idx)
-            writer.add_scalar("reward_100", m_reward, frame_idx)
-            writer.add_scalar("reward", reward, frame_idx)
+    trainer = drl.net.trainer.ParallelTrainer()
+    trainer.add_net(net)
+    trainer.add_target_agent(tgt_net)
+    trainer.add_buffer(rp_buffer, params.replay_initial)
+    trainer.add_tensorboard_writer(writer)
 
-            if best_m_reward is None or best_m_reward < m_reward:
-                torch.save(net.state_dict(), params.env_name + "-best_%.0f.dat"%m_reward)
-                if best_m_reward is not None:
-                    print("Best reward update %.3f -> %.3f"%(best_m_reward, m_reward))
-                best_m_reward = m_reward
+    trainer.run_parallel(exp_queue, optimizer, loss, params.batch_size * BATCH_MUL, params.stop_reward, 100, params.target_net_sync)
+    #while True:
+    #    reward, step, epsilon = None, None, None
+    #    while exp_queue.qsize() > 0:
+    #        exp = exp_queue.get()
+    #        if isinstance(exp, EpisodeEnded):
+    #            reward, step, epsilon = exp.reward, exp.step, exp.epsilon
+    #        else:
+    #            rp_buffer.append(exp)
 
-            if m_reward > params.stop_reward:
-                print("Solved in %d frames!" % frame_idx)
-                break
+    #    if reward is not None:
+    #        total_reward.append(reward)
+    #        speed = step / (time.time() - ts)
+    #        ts = time.time()
+    #        m_reward = np.mean(total_reward[-100:])
+    #        print("%d: done %d games, reward %.3f, eps %.2f, speed %.2f f/s"%(frame_idx, len(total_reward), m_reward, epsilon, speed))
+    #        writer.add_scalar("epsilon", epsilon, frame_idx)
+    #        writer.add_scalar("speed", speed, frame_idx)
+    #        writer.add_scalar("reward_100", m_reward, frame_idx)
+    #        writer.add_scalar("reward", reward, frame_idx)
 
-        if len(rp_buffer) < params.replay_initial:
-            continue
-        if frame_idx % params.target_net_sync == 0:
-            tgt_net.sync()
+    #        if best_m_reward is None or best_m_reward < m_reward:
+    #            torch.save(net.state_dict(), params.env_name + "-best_%.0f.dat"%m_reward)
+    #            if best_m_reward is not None:
+    #                print("Best reward update %.3f -> %.3f"%(best_m_reward, m_reward))
+    #            best_m_reward = m_reward
 
-        optimizer.zero_grad()
-        batch = rp_buffer.sample(params.batch_size * BATCH_MUL)
-        #loss_t = calc_loss(batch, agent.model, tgt_net.target_model, params.gamma, device)
-        loss_t = loss(batch)
-        loss_t.backward()
-        optimizer.step()
+    #        if m_reward > params.stop_reward:
+    #            print("Solved in %d frames!" % frame_idx)
+    #            break
+
+    #    if len(rp_buffer) < params.replay_initial:
+    #        continue
+    #    if frame_idx % params.target_net_sync == 0:
+    #        tgt_net.sync()
+
+    #    optimizer.zero_grad()
+    #    batch = rp_buffer.sample(params.batch_size * BATCH_MUL)
+    #    #loss_t = calc_loss(batch, agent.model, tgt_net.target_model, params.gamma, device)
+    #    loss_t = loss(batch)
+    #    loss_t.backward()
+    #    optimizer.step()
 
     play_proc.kill()
     play_proc.join()
-    writer.close()
+    #writer.close()
