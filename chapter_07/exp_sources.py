@@ -29,12 +29,6 @@ class DullAgent (ptan.agent.BaseAgent):
     def __call__ (self, observations: List[Any], state: Optional[List]=None) -> Tuple[List[int], Optional[List]]:
         return [self.action for _ in observations], state
 
-class DullAgent1 (rl_lib.agent.BaseAgent):
-    def __init__ (self, action: int):
-        self.action = action
-
-    def __call__ (self, observations: List[Any], state: Optional[List]=None) -> Tuple[List[int], Optional[List]]:
-        return [self.action for _ in observations]
 
 if __name__ == "__main__":
     env = ToyEnv()
@@ -48,12 +42,12 @@ if __name__ == "__main__":
     # exp_source = ptan.experience.ExperienceSource(env=env, agent=agent, steps_count=4)
     # print(next(iter(exp_source)))
 
-    # print("multi env")
-    # exp_source = ptan.experience.ExperienceSource(env=[ToyEnv(), ToyEnv()], agent=agent, steps_count=2)
-    # for idx, exp in enumerate(exp_source):
-    #     if idx > 4:
-    #         break
-    #     print(exp)
+    print("multi env")
+    exp_source = ptan.experience.ExperienceSource(env=[ToyEnv(), ToyEnv()], agent=agent, steps_count=2)
+    for idx, exp in enumerate(exp_source):
+        if idx > 1:
+            break
+        print(idx, exp, type(exp))
 
     print("exp source first last")
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=1.0, steps_count=2)
@@ -61,3 +55,11 @@ if __name__ == "__main__":
         print(idx, exp)
         if idx > 3:
             break 
+    print("multi env")
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env=[ToyEnv(), ToyEnv()], agent=agent, steps_count=2, gamma=1.0)
+    for idx, exp in enumerate(exp_source):
+        if idx > 1:
+            break
+        print(exp)
+
+
