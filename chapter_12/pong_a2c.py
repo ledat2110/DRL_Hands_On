@@ -25,8 +25,9 @@ GRAD_L2_CLIP = 0.1
 ENV_COUNT = 50
 
 def make_env ():
-    env = drl_lib.wrapper.make_atari("PongNoFrameskip-v4", skip_noop=True, skip_maxskip=True)
-    env = drl_lib.wrapper.wrap_deepmind(env, pytorch_img=True, frame_stack=True, frame_stack_count=2)
+    #env = drl_lib.wrapper.make_atari("PongNoFrameskip-v4", skip_noop=True, skip_maxskip=True)
+    #env = drl_lib.wrapper.wrap_deepmind(env, pytorch_img=True, frame_stack=True, frame_stack_count=2)
+    env = drl_lib.wrapper.wrap_dqn(gym.make("PongNoFrameskip-v4"))
 
     return env
 
